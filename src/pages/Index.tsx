@@ -34,73 +34,83 @@ const Index = () => {
   };
 
   const getBalance = async (walletAddress: string) => {
-    const response = await fetch(`${BASE_URL}/accounts/${walletAddress}`, {
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        Accept: "application/json",
-      },
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    for (const balance of data.balances || []) {
-      if (balance.asset_type === "native") {
-        return parseFloat(balance.balance);
-      }
-    }
-    return null;
-  };
-
-  const getClaimableBalances = async (walletAddress: string) => {
-    const response = await fetch(
-      `${BASE_URL}/claimable_balances/?claimant=${walletAddress}`,
-      {
+    try {
+      const response = await fetch(`${BASE_URL}/accounts/${walletAddress}`, {
         headers: {
           Authorization: `Bearer ${API_KEY}`,
           Accept: "application/json",
         },
-      }
-    );
+      });
 
-    if (!response.ok) return [];
+      if (!response.ok) return null;
 
-    const data = await response.json();
-    const records = data._embedded?.records || [];
-
-    return records.map((record: any) => {
-      const lastModifiedTime = convertToVietnamTime(record.last_modified_time);
-      let unlockTime = "Chưa xác định";
-      let unlockDaysLeft = "N/A";
-
-      for (const claimant of record.claimants) {
-        if (claimant.destination === walletAddress) {
-          const predicate = claimant.predicate;
-          if (predicate.abs_before) {
-            unlockTime = convertToVietnamTime(predicate.abs_before);
-            const unlockDate = new Date(predicate.abs_before);
-            const now = new Date();
-            const daysLeft = Math.ceil((unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-            unlockDaysLeft = daysLeft.toString();
-          } else if (predicate.not?.abs_before) {
-            unlockTime = convertToVietnamTime(predicate.not.abs_before);
-            const unlockDate = new Date(predicate.not.abs_before);
-            const now = new Date();
-            const daysLeft = Math.ceil((unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-            unlockDaysLeft = daysLeft.toString();
-          }
+      const data = await response.json();
+      for (const balance of data.balances || []) {
+        if (balance.asset_type === "native") {
+          return parseFloat(balance.balance);
         }
       }
+      return null;
+    } catch (error) {
+      console.error("❌ Lỗi lấy số dư:", error);
+      return null;
+    }
+  };
 
-      return {
-        id: record.id,
-        amount: record.amount,
-        asset: "Pi",
-        updatedAt: lastModifiedTime,
-        unlockTime,
-        unlockDaysLeft,
-      };
-    });
+  const getClaimableBalances = async (walletAddress: string) => {
+    try {
+      const response = await fetch(
+        `${BASE_URL}/claimable_balances/?claimant=${walletAddress}`,
+        {
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) return [];
+
+      const data = await response.json();
+      const records = data._embedded?.records || [];
+
+      return records.map((record: any) => {
+        const lastModifiedTime = convertToVietnamTime(record.last_modified_time);
+        let unlockTime = "Chưa xác định";
+        let unlockDaysLeft = "N/A";
+
+        for (const claimant of record.claimants) {
+          if (claimant.destination === walletAddress) {
+            const predicate = claimant.predicate;
+            if (predicate.abs_before) {
+              unlockTime = convertToVietnamTime(predicate.abs_before);
+              const unlockDate = new Date(predicate.abs_before);
+              const now = new Date();
+              const daysLeft = Math.ceil((unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              unlockDaysLeft = daysLeft.toString();
+            } else if (predicate.not?.abs_before) {
+              unlockTime = convertToVietnamTime(predicate.not.abs_before);
+              const unlockDate = new Date(predicate.not.abs_before);
+              const now = new Date();
+              const daysLeft = Math.ceil((unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+              unlockDaysLeft = daysLeft.toString();
+            }
+          }
+        }
+
+        return {
+          id: record.id,
+          amount: record.amount,
+          asset: "Pi",
+          updatedAt: lastModifiedTime,
+          unlockTime,
+          unlockDaysLeft,
+        };
+      });
+    } catch (error) {
+      console.error("❌ Lỗi lấy số dư khóa:", error);
+      return [];
+    }
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -124,6 +134,7 @@ const Index = () => {
         toast.error("Không thể lấy số dư hoặc ví không tồn tại!");
       }
     } catch (error) {
+      console.error("❌ Lỗi tìm kiếm:", error);
       toast.error("Có lỗi xảy ra khi tìm kiếm dữ liệu");
     } finally {
       setIsLoading(false);
@@ -176,86 +187,92 @@ const Index = () => {
           </div>
         </form>
 
-        <div className="grid md:grid-cols-2 gap-6 fade-in">
-          <div className="glass-card rounded-xl p-6 space-y-3 hover:shadow-lg transition-shadow duration-300">
-            <div className="flex items-center space-x-3 text-muted-foreground">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <Wallet className="h-6 w-6 text-purple-600" />
+        {(balance !== null || claimableBalances.length > 0) && (
+          <>
+            <div className="grid md:grid-cols-2 gap-6 fade-in">
+              <div className="glass-card rounded-xl p-6 space-y-3 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center space-x-3 text-muted-foreground">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Wallet className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <span className="text-lg font-medium">Số Dư Hiện Tại</span>
+                </div>
+                <div className="balance-number bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  {balance?.toFixed(2) || "0.00"} PI
+                </div>
+                <p className="text-sm text-muted-foreground">Số Pi khả dụng trong ví</p>
               </div>
-              <span className="text-lg font-medium">Số Dư Hiện Tại</span>
-            </div>
-            <div className="balance-number bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              {balance?.toFixed(2) || "0.00"} PI
-            </div>
-            <p className="text-sm text-muted-foreground">Số Pi khả dụng trong ví</p>
-          </div>
 
-          <div className="glass-card rounded-xl p-6 space-y-3 hover:shadow-lg transition-shadow duration-300">
-            <div className="flex items-center space-x-3 text-muted-foreground">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Lock className="h-6 w-6 text-blue-600" />
+              <div className="glass-card rounded-xl p-6 space-y-3 hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center space-x-3 text-muted-foreground">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Lock className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <span className="text-lg font-medium">Tổng Số Dư Đang Bị Khóa</span>
+                </div>
+                <div className="balance-number bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                  {claimableBalances
+                    .reduce((sum, item) => sum + parseFloat(item.amount), 0)
+                    .toFixed(2)} PI
+                </div>
+                <p className="text-sm text-muted-foreground">Tổng số Pi đang trong thời gian khóa</p>
               </div>
-              <span className="text-lg font-medium">Tổng Số Dư Đang Bị Khóa</span>
             </div>
-            <div className="balance-number bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              {claimableBalances
-                .reduce((sum, item) => sum + parseFloat(item.amount), 0)
-                .toFixed(2)} PI
-            </div>
-            <p className="text-sm text-muted-foreground">Tổng số Pi đang trong thời gian khóa</p>
-          </div>
-        </div>
 
-        <div className="glass-card rounded-xl p-6 space-y-4 fade-in">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3 text-muted-foreground">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Lock className="h-6 w-6 text-blue-600" />
+            {claimableBalances.length > 0 && (
+              <div className="glass-card rounded-xl p-6 space-y-4 fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3 text-muted-foreground">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Lock className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <span className="text-lg font-medium">Danh Sách Số Dư Đang Bị Khóa</span>
+                  </div>
+                  <Button variant="outline" size="icon" className="rounded-lg hover:bg-blue-50">
+                    <ArrowUpRight className="h-5 w-5" />
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border shadow-sm overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID Giao Dịch</TableHead>
+                        <TableHead>Số Lượng</TableHead>
+                        <TableHead>Tài Sản</TableHead>
+                        <TableHead className="hidden md:table-cell">Thời Gian Cập Nhật</TableHead>
+                        <TableHead className="hidden md:table-cell">Thời Gian Mở Khóa</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {claimableBalances.map((tx) => (
+                        <TableRow key={tx.id}>
+                          <TableCell className="font-medium max-w-[200px] truncate">
+                            <div className="flex items-center space-x-2">
+                              <span className="truncate">{tx.id}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 shrink-0 hover:bg-blue-50"
+                                onClick={() => copyToClipboard(tx.id)}
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>{tx.amount} PI</TableCell>
+                          <TableCell>{tx.asset}</TableCell>
+                          <TableCell className="hidden md:table-cell">{tx.updatedAt}</TableCell>
+                          <TableCell className="hidden md:table-cell">{tx.unlockTime}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
-              <span className="text-lg font-medium">Danh Sách Số Dư Đang Bị Khóa</span>
-            </div>
-            <Button variant="outline" size="icon" className="rounded-lg hover:bg-blue-50">
-              <ArrowUpRight className="h-5 w-5" />
-            </Button>
-          </div>
-
-          <div className="rounded-xl border shadow-sm overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID Giao Dịch</TableHead>
-                  <TableHead>Số Lượng</TableHead>
-                  <TableHead>Tài Sản</TableHead>
-                  <TableHead className="hidden md:table-cell">Thời Gian Cập Nhật</TableHead>
-                  <TableHead className="hidden md:table-cell">Thời Gian Mở Khóa</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {claimableBalances.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell className="font-medium max-w-[200px] truncate">
-                      <div className="flex items-center space-x-2">
-                        <span className="truncate">{tx.id}</span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 hover:bg-blue-50"
-                          onClick={() => copyToClipboard(tx.id)}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell>{tx.amount} PI</TableCell>
-                    <TableCell>{tx.asset}</TableCell>
-                    <TableCell className="hidden md:table-cell">{tx.updatedAt}</TableCell>
-                    <TableCell className="hidden md:table-cell">{tx.unlockTime}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
