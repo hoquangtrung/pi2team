@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Search, Wallet, Lock, ArrowUpRight, Copy } from "lucide-react";
+import { Search, Wallet, Lock, ArrowUpRight, Copy, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -147,23 +147,32 @@ const Index = () => {
       </div>
 
       <form onSubmit={handleSearch} className="max-w-3xl mx-auto space-y-4 fade-in">
-        <div className="relative">
-          <Input
-            type="text"
-            placeholder="Nhập địa chỉ ví Pi của bạn"
-            className="pr-10 h-12"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-          />
-          <Search className="absolute right-3 top-3.5 h-5 w-5 text-muted-foreground" />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Input
+              type="text"
+              placeholder="Nhập địa chỉ ví Pi của bạn"
+              className="pr-10 h-12"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+            <Search className="absolute right-3 top-3.5 h-5 w-5 text-muted-foreground" />
+          </div>
+          <Button
+            type="submit"
+            className="h-12 px-6"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Đang tìm kiếm
+              </>
+            ) : (
+              "Tìm kiếm"
+            )}
+          </Button>
         </div>
-        <Button
-          type="submit"
-          className="w-full md:w-auto"
-          disabled={isLoading}
-        >
-          {isLoading ? "Đang tìm kiếm..." : "Tìm kiếm"}
-        </Button>
       </form>
 
       <div className="grid md:grid-cols-2 gap-6 fade-in">
