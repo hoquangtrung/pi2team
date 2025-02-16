@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Search, Wallet, LockClosed, ArrowUpRight, Copy } from "lucide-react";
+import { Search, Wallet, Lock, ArrowUpRight, Copy } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -86,7 +86,7 @@ const Index = () => {
 
         <div className="glass-card rounded-lg p-6 space-y-2">
           <div className="flex items-center space-x-2 text-muted-foreground">
-            <LockClosed className="h-5 w-5" />
+            <Lock className="h-5 w-5" />
             <span>Tổng Số Dư Đang Bị Khóa</span>
           </div>
           <div className="balance-number">571.57 PI</div>
@@ -99,7 +99,7 @@ const Index = () => {
       <div className="glass-card rounded-lg p-6 space-y-4 fade-in">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2 text-muted-foreground">
-            <LockClosed className="h-5 w-5" />
+            <Lock className="h-5 w-5" />
             <span>Danh Sách Số Dư Đang Bị Khóa</span>
           </div>
           <Button variant="outline" size="icon">
