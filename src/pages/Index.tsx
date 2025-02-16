@@ -13,35 +13,125 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 
+const API_KEY = "gsyrbyj4rfvvddmon30krlczn6ccdpnbshzrkxzklehn5uavnasjgkvc0lfgqjmp";
+const BASE_URL = "https://api.mainnet.minepi.com";
+
 const Index = () => {
   const [address, setAddress] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [claimableBalances, setClaimableBalances] = useState<any[]>([]);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const convertToVietnamTime = (utcTimeStr: string) => {
+    try {
+      const utcDate = new Date(utcTimeStr);
+      const vnTime = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000);
+      return vnTime.toLocaleString("vi-VN");
+    } catch (e) {
+      console.error("❌ Lỗi chuyển đổi thời gian:", e);
+      return "Không xác định";
+    }
+  };
+
+  const getBalance = async (walletAddress: string) => {
+    const response = await fetch(`${BASE_URL}/accounts/${walletAddress}`, {
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    for (const balance of data.balances || []) {
+      if (balance.asset_type === "native") {
+        return parseFloat(balance.balance);
+      }
+    }
+    return null;
+  };
+
+  const getClaimableBalances = async (walletAddress: string) => {
+    const response = await fetch(
+      `${BASE_URL}/claimable_balances/?claimant=${walletAddress}`,
+      {
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          Accept: "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    const records = data._embedded?.records || [];
+
+    return records.map((record: any) => {
+      const lastModifiedTime = convertToVietnamTime(record.last_modified_time);
+      let unlockTime = "Chưa xác định";
+      let unlockDaysLeft = "N/A";
+
+      for (const claimant of record.claimants) {
+        if (claimant.destination === walletAddress) {
+          const predicate = claimant.predicate;
+          if (predicate.abs_before) {
+            unlockTime = convertToVietnamTime(predicate.abs_before);
+            const unlockDate = new Date(predicate.abs_before);
+            const now = new Date();
+            unlockDaysLeft = Math.ceil((unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          } else if (predicate.not?.abs_before) {
+            unlockTime = convertToVietnamTime(predicate.not.abs_before);
+            const unlockDate = new Date(predicate.not.abs_before);
+            const now = new Date();
+            unlockDaysLeft = Math.ceil((unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          }
+        }
+      }
+
+      return {
+        id: record.id,
+        amount: record.amount,
+        asset: "Pi",
+        updatedAt: lastModifiedTime,
+        unlockTime,
+        unlockDaysLeft,
+      };
+    });
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!address) {
       toast.error("Vui lòng nhập địa chỉ ví");
       return;
     }
+    
     setIsLoading(true);
-    // Simulated loading state
-    setTimeout(() => setIsLoading(false), 1000);
+    try {
+      const [balanceResult, claimableResult] = await Promise.all([
+        getBalance(address),
+        getClaimableBalances(address),
+      ]);
+
+      setBalance(balanceResult);
+      setClaimableBalances(claimableResult);
+
+      if (balanceResult === null) {
+        toast.error("Không thể lấy số dư hoặc ví không tồn tại!");
+      }
+    } catch (error) {
+      toast.error("Có lỗi xảy ra khi tìm kiếm dữ liệu");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success("Đã sao chép vào clipboard");
   };
-
-  const transactions = [
-    {
-      id: "00000000...0195",
-      amount: "571.57 PI",
-      asset: "Pi",
-      updatedAt: "21:36:35 21/5/2023",
-      unlockTime: "Chưa xác định",
-    },
-  ];
 
   return (
     <div className="min-h-screen p-4 md:p-8 space-y-8 max-w-7xl mx-auto">
@@ -59,11 +149,11 @@ const Index = () => {
           <Input
             type="text"
             placeholder="Nhập địa chỉ ví Pi của bạn"
-            className="pl-10 h-12"
+            className="pr-10 h-12"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
           />
-          <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute right-3 top-3.5 h-5 w-5 text-muted-foreground" />
         </div>
         <Button
           type="submit"
@@ -80,7 +170,7 @@ const Index = () => {
             <Wallet className="h-5 w-5" />
             <span>Số Dư Hiện Tại</span>
           </div>
-          <div className="balance-number">9.37 PI</div>
+          <div className="balance-number">{balance?.toFixed(2) || "0.00"} PI</div>
           <p className="text-sm text-muted-foreground">Số Pi khả dụng trong ví</p>
         </div>
 
@@ -89,7 +179,11 @@ const Index = () => {
             <Lock className="h-5 w-5" />
             <span>Tổng Số Dư Đang Bị Khóa</span>
           </div>
-          <div className="balance-number">571.57 PI</div>
+          <div className="balance-number">
+            {claimableBalances
+              .reduce((sum, item) => sum + parseFloat(item.amount), 0)
+              .toFixed(2)} PI
+          </div>
           <p className="text-sm text-muted-foreground">
             Tổng số Pi đang trong thời gian khóa
           </p>
@@ -119,7 +213,7 @@ const Index = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.map((tx) => (
+              {claimableBalances.map((tx) => (
                 <TableRow key={tx.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center space-x-2">
@@ -134,7 +228,7 @@ const Index = () => {
                       </Button>
                     </div>
                   </TableCell>
-                  <TableCell>{tx.amount}</TableCell>
+                  <TableCell>{tx.amount} PI</TableCell>
                   <TableCell>{tx.asset}</TableCell>
                   <TableCell>{tx.updatedAt}</TableCell>
                   <TableCell>{tx.unlockTime}</TableCell>
