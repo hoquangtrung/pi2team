@@ -80,12 +80,14 @@ const Index = () => {
             unlockTime = convertToVietnamTime(predicate.abs_before);
             const unlockDate = new Date(predicate.abs_before);
             const now = new Date();
-            unlockDaysLeft = Math.ceil((unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            const daysLeft = Math.ceil((unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            unlockDaysLeft = daysLeft.toString();
           } else if (predicate.not?.abs_before) {
             unlockTime = convertToVietnamTime(predicate.not.abs_before);
             const unlockDate = new Date(predicate.not.abs_before);
             const now = new Date();
-            unlockDaysLeft = Math.ceil((unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            const daysLeft = Math.ceil((unlockDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            unlockDaysLeft = daysLeft.toString();
           }
         }
       }
